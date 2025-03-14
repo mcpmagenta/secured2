@@ -328,8 +328,8 @@ interface ThreeJSCanvasProps {
   phaseColors: { [key: string]: string };
 }
 
-// Using named function to avoid 'Cannot redeclare exported variable default' error
-function ThreeJSCanvasComponent({ progress, currentPhase }: ThreeJSCanvasProps): React.ReactElement {
+// Using a function expression to avoid naming conflicts
+const ThreeJSCanvas = ({ progress, currentPhase }: ThreeJSCanvasProps): React.ReactElement => {
   return (
     <Canvas
       shadows
@@ -370,4 +370,4 @@ function ThreeJSCanvasComponent({ progress, currentPhase }: ThreeJSCanvasProps):
 }
 
 // Export the component as default
-export default ThreeJSCanvasComponent;
+export default ThreeJSCanvas;

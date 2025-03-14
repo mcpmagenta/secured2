@@ -7,14 +7,5 @@ declare module '*.tsx' {
   export default component;
 }
 
-// Specific declaration for ThreeJSCanvas
-declare module './ThreeJSCanvas' {
-  interface ThreeJSCanvasProps {
-    progress: number;
-    currentPhase: string;
-    phaseColors: { [key: string]: string };
-  }
-  
-  const ThreeJSCanvas: React.ComponentType<ThreeJSCanvasProps>;
-  export default ThreeJSCanvas;
-}
+// We're using the general module declaration above for all .tsx files
+// No specific declaration needed for ThreeJSCanvas

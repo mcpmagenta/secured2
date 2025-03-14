@@ -26,6 +26,9 @@ interface ProgressBarColors {
 const DataProtectionJourney: React.FC<DataProtectionJourneyProps> = ({ 
   scrollContainerId = 'data-journey-section' 
 }) => {
+  // Track if we're on a mobile device for animation adjustments
+  const [isMobile, setIsMobile] = useState(false);
+  
   // Refs for DOM elements and Three.js objects
   const containerRef = useRef<HTMLDivElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -699,7 +702,8 @@ const DataProtectionJourney: React.FC<DataProtectionJourneyProps> = ({
     shackleFullyOpenPosition.y,
     shackleFullyOpenRotation.x,
     shacklePartiallyOpenPosition.y,
-    shacklePartiallyOpenRotation.x
+    shacklePartiallyOpenRotation.x,
+    isMobile
   ]);
   
   // Setup the animation function
@@ -1697,8 +1701,6 @@ const DataProtectionJourney: React.FC<DataProtectionJourneyProps> = ({
   }, [setupTimeline, animateObjects, setupAnimation]);
   
   // Handle window resize
-  // Track if we're on a mobile device for animation adjustments
-  const [isMobile, setIsMobile] = useState(false);
   
   useEffect(() => {
     const handleResize = () => {
