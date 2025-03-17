@@ -62,11 +62,13 @@ const DataProtectionJourney: React.FC<DataProtectionJourneyProps> = ({
   
   // Rotation values for the shackle
   const shackleClosedRotation = { x: 0, y: 0, z: 0 }; // Closed position (both legs in)
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const shacklePartiallyOpenRotation = { x: -Math.PI / 3, y: 0, z: 0 }; // 60 degrees open
   const shackleFullyOpenRotation = { x: -Math.PI * 0.75, y: 0, z: 0 }; // 135° backward - very clearly open
   
   // Translation values for the sliding effect - real padlocks slide up when unlocking
   const shackleClosedPosition = { y: 0 }; // Flush with the lock body
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const shacklePartiallyOpenPosition = { y: 0.12 }; // More upward movement
   const shackleFullyOpenPosition = { y: 0.2 }; // Significant upward movement when fully open
   
@@ -762,7 +764,7 @@ const DataProtectionJourney: React.FC<DataProtectionJourneyProps> = ({
       
       // Make shredded data disappear more smoothly as it approaches the secure stage
       // Start fading out particles during the shred stage and complete by secure stage
-      shredGroup.children.forEach((child, index) => {
+      shredGroup.children.forEach((child) => {
         if (child instanceof THREE.Mesh && child.material) {
           // Start fading earlier in the timeline (around 50-60% mark)
           // This creates a smoother transition as we approach the secure stage
@@ -828,7 +830,8 @@ const DataProtectionJourney: React.FC<DataProtectionJourneyProps> = ({
         if (element instanceof THREE.Mesh && 
             element.material instanceof THREE.MeshStandardMaterial) {
           const material = element.material;
-          const initialIntensity = material.emissiveIntensity || 1.0;
+          // Set emissive intensity directly instead of storing unused variable
+          material.emissiveIntensity = material.emissiveIntensity || 1.0;
           
           // Removed all GSAP animations that affect emissiveIntensity
           // The material will maintain its initial emissive intensity throughout
@@ -841,13 +844,8 @@ const DataProtectionJourney: React.FC<DataProtectionJourneyProps> = ({
     shackleClosedRotation.x,
     shackleFullyOpenPosition.y,
     shackleFullyOpenRotation.x,
-    shacklePartiallyOpenPosition.y,
-    shacklePartiallyOpenRotation.x,
+    // Removed unnecessary dependencies as per ESLint warning
     isMobile
-    // Removed unnecessary dependencies:
-    // shackleClosedRotation.z, 
-    // shackleFullyOpenRotation.z, 
-    // shacklePartiallyOpenRotation.z
   ]);
   
   // Setup the animation function
@@ -1183,7 +1181,7 @@ const DataProtectionJourney: React.FC<DataProtectionJourneyProps> = ({
         console.error('Error during cleanup:', error);
       }
     };
-  }, []);
+  }, [scrollContainerId]);
   
   // Create the 3D objects for the data protection journey
   useLayoutEffect(() => {
@@ -1904,7 +1902,7 @@ const DataProtectionJourney: React.FC<DataProtectionJourneyProps> = ({
     return () => {
       window.removeEventListener('resize', handleResize);
     };
-  }, []);
+  }, [scrollContainerId]);
   
   // Additional cleanup effect specifically for ScrollTrigger
   useEffect(() => {
@@ -1914,7 +1912,7 @@ const DataProtectionJourney: React.FC<DataProtectionJourneyProps> = ({
         ScrollTrigger.getAll().forEach(trigger => trigger.kill());
       }
     };
-  }, []);
+  }, [scrollContainerId]);
   
   // Calculate progress bar colors based on scroll progress
   const getProgressBarColors = (): ProgressBarColors => {
