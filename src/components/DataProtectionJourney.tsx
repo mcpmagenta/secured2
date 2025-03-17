@@ -124,6 +124,11 @@ const DataProtectionJourney: React.FC<DataProtectionJourneyProps> = ({
       }
     });
     
+    // Make sure ScrollTrigger is registered in production
+    if (typeof window !== 'undefined') {
+      gsap.registerPlugin(ScrollTrigger, MotionPathPlugin);
+    }
+    
     // Create a new ScrollTrigger with safer configuration
     ScrollTrigger.create({
       id: `dataJourney-${scrollContainerId}`, // Add a specific ID for easier cleanup
@@ -1904,14 +1909,21 @@ const DataProtectionJourney: React.FC<DataProtectionJourneyProps> = ({
     };
   }, [scrollContainerId]);
   
-  // Additional cleanup effect specifically for ScrollTrigger
+  // Effect to ensure ScrollTrigger works in production
   useEffect(() => {
-    return () => {
-      // Ensure all ScrollTrigger instances are killed on component unmount
-      if (typeof ScrollTrigger !== 'undefined') {
+    // Force ScrollTrigger refresh after component mounts
+    if (typeof ScrollTrigger !== 'undefined') {
+      // Small delay to ensure DOM is fully ready
+      const refreshTimer = setTimeout(() => {
+        ScrollTrigger.refresh();
+      }, 100);
+      
+      return () => {
+        clearTimeout(refreshTimer);
+        // Ensure all ScrollTrigger instances are killed on component unmount
         ScrollTrigger.getAll().forEach(trigger => trigger.kill());
-      }
-    };
+      };
+    }
   }, [scrollContainerId]);
   
   // Calculate progress bar colors based on scroll progress
@@ -1949,7 +1961,8 @@ const DataProtectionJourney: React.FC<DataProtectionJourneyProps> = ({
     }
   };
   
-  const { from, to, progress } = getProgressBarColors();
+  // Extract values once and memoize to prevent recalculation during render
+  const { from, to, progress, stageName } = getProgressBarColors();
   
   return (
     <div ref={containerRef} className="w-full h-full" style={{ zIndex: 5 }}>
@@ -1979,7 +1992,7 @@ const DataProtectionJourney: React.FC<DataProtectionJourneyProps> = ({
               textShadow: `0 0 10px ${from}80`
             }}
           >
-            {getProgressBarColors().stageName}
+            {stageName}
           </span>
           <span className="text-gray-400"> Progress</span>
         </div>
