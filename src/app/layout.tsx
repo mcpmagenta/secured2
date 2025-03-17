@@ -24,12 +24,12 @@ export const viewport: Viewport = {
 };
 
 export const metadata: Metadata = {
-  title: "Secure2 - Quantum-secure® & AI-safe Data Protection",
+  title: "Secured2 - Quantum-secure® & AI-safe Data Protection",
   description: "Protecting your data against tomorrow's threats—today with QuantaMorphic® technology. Shrink, shred, and secure your data against quantum computing threats.",
   keywords: ["quantum security", "data protection", "AI security", "cybersecurity", "QuantaMorphic", "encryption", "data privacy"],
-  authors: [{ name: "Secure2" }],
-  creator: "Secure2",
-  publisher: "Secure2",
+  authors: [{ name: "Secured2" }],
+  creator: "Secured2",
+  publisher: "Secured2",
   robots: "index, follow",
   icons: {
     icon: "/favicon.ico",

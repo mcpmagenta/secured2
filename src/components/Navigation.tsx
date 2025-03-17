@@ -47,7 +47,7 @@ const Navigation = () => {
           {/* Logo */}
           <Link href="/" className="flex items-center">
             <span className="text-2xl font-bold bg-gradient-to-r from-blue-400 to-cyan-400 bg-clip-text text-transparent">
-              Secure2
+              Secured2
             </span>
           </Link>
 

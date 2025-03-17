@@ -415,7 +415,7 @@ const scrollTriggerStore = {
               Industry Solutions
             </h2>
             <p className="text-xl text-gray-300 max-w-2xl mx-auto">
-              Secure2 provides tailored security solutions for various industries
+              Secured2 provides tailored security solutions for various industries
             </p>
           </div>
           
@@ -477,7 +477,7 @@ const scrollTriggerStore = {
             Ready to secure your data?
           </h2>
           <p className="text-xl text-gray-300 max-w-2xl mx-auto mb-10">
-            Contact us today to learn how Secure2 can protect your most valuable assets
+            Contact us today to learn how Secured2 can protect your most valuable assets
           </p>
           
           <div className="flex flex-col sm:flex-row gap-6 justify-center">
@@ -503,7 +503,7 @@ const scrollTriggerStore = {
           <div className="flex flex-col md:flex-row justify-between items-center">
             <div className="mb-6 md:mb-0">
               <span className="text-2xl font-bold bg-gradient-to-r from-blue-400 to-cyan-400 bg-clip-text text-transparent">
-                Secure2
+                Secured2
               </span>
               <p className="text-gray-400 mt-2">Quantum-secure® & AI-safe Data Protection</p>
             </div>
@@ -522,7 +522,7 @@ const scrollTriggerStore = {
           </div>
           
           <div className="mt-8 text-center text-gray-500">
-            © {new Date().getFullYear()} Secure2. All rights reserved.
+            © {new Date().getFullYear()} Secured2. All rights reserved.
           </div>
         </div>
       </footer>
