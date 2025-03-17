@@ -111,46 +111,58 @@ const DataProtectionJourney: React.FC<DataProtectionJourneyProps> = ({
     // This component will only control the animation timeline
     
     // Create ScrollTrigger for the animation timeline with simplified configuration
-    // Avoid using pin here to prevent DOM insertion errors
-    ScrollTrigger.create({
-      trigger: `#${scrollContainerId}`,
-      start: 'top top', // Start immediately at the top
-      end: '+=150%', // Increase scroll distance for slower animation progression
-      scrub: 3, // Increase scrub value for smoother, slower transitions
-      pin: false, // Don't pin here to avoid conflicts
-      anticipatePin: 1, // Improves performance
-      markers: false, // Set to true for debugging
-      onLeaveBack: (self) => {
-        // Ensure animation is reset when scrolling back to the top
-        if (self.progress < 0.1) {
-          tl.progress(0);
+    // Use a safer configuration to prevent DOM insertion errors
+    // Wait for a small delay to ensure DOM is ready
+    setTimeout(() => {
+      // Clear any existing ScrollTrigger instances for this trigger
+      ScrollTrigger.getAll().forEach(st => {
+        if (st.vars.trigger === `#${scrollContainerId}`) {
+          st.kill();
         }
-      },
-      onUpdate: (self) => {
-        // Update scroll progress for progress bar (0-100)
-        setScrollProgress(Math.round(self.progress * 100));
-        
-        // Update current stage based on progress with adjusted boundaries
-        // Shrink phase: 0-35%, Shred phase: 35-70%, Secure phase: 70-100%
-        if (self.progress < 0.35) {
-          setCurrentStage('shrink');
-        } else if (self.progress < 0.70) {
-          setCurrentStage('shred');
-        } else {
-          // Secure stage goes all the way to 100%
-          setCurrentStage('secure');
+      });
+      
+      // Create a new ScrollTrigger with safer configuration
+      ScrollTrigger.create({
+        id: `dataJourney-${scrollContainerId}`, // Add a specific ID for easier cleanup
+        trigger: `#${scrollContainerId}`,
+        start: 'top top', // Start immediately at the top
+        end: '+=150%', // Increase scroll distance for slower animation progression
+        scrub: 3, // Increase scrub value for smoother, slower transitions
+        pin: false, // Don't pin here to avoid conflicts
+        anticipatePin: 1, // Improves performance
+        markers: false, // Set to true for debugging
+        onLeaveBack: (self) => {
+          // Ensure animation is reset when scrolling back to the top
+          if (self.progress < 0.1) {
+            tl.progress(0);
+          }
+        },
+        onUpdate: (self) => {
+          // Update scroll progress for progress bar (0-100)
+          setScrollProgress(Math.round(self.progress * 100));
+          
+          // Update current stage based on progress with adjusted boundaries
+          // Shrink phase: 0-35%, Shred phase: 35-70%, Secure phase: 70-100%
+          if (self.progress < 0.35) {
+            setCurrentStage('shrink');
+          } else if (self.progress < 0.70) {
+            setCurrentStage('shred');
+          } else {
+            // Secure stage goes all the way to 100%
+            setCurrentStage('secure');
+          }
+          
+          // Make sure the animation is still running
+          if (rendererRef.current && sceneRef.current && cameraRef.current) {
+            rendererRef.current.render(sceneRef.current, cameraRef.current);
+          }
+          
+          // Update the timeline based on scroll progress
+          // This is the key part - the timeline controls all animations
+          tl.progress(self.progress);
         }
-        
-        // Make sure the animation is still running
-        if (rendererRef.current && sceneRef.current && cameraRef.current) {
-          rendererRef.current.render(sceneRef.current, cameraRef.current);
-        }
-        
-        // Update the timeline based on scroll progress
-        // This is the key part - the timeline controls all animations
-        tl.progress(self.progress);
-      }
-    });
+      });
+    }, 100); // Small delay to ensure DOM is ready
     
     // ===== MASTER TIMELINE SETUP =====
     // This single timeline will control all animations based on scroll position
@@ -693,10 +705,7 @@ const DataProtectionJourney: React.FC<DataProtectionJourneyProps> = ({
       });
     }
   }, [
-    scrollContainerId, 
-    shackleClosedRotation.z, 
-    shackleFullyOpenRotation.z, 
-    shacklePartiallyOpenRotation.z,
+    scrollContainerId,
     shackleClosedPosition.y,
     shackleClosedRotation.x,
     shackleFullyOpenPosition.y,
@@ -704,6 +713,10 @@ const DataProtectionJourney: React.FC<DataProtectionJourneyProps> = ({
     shacklePartiallyOpenPosition.y,
     shacklePartiallyOpenRotation.x,
     isMobile
+    // Removed unnecessary dependencies:
+    // shackleClosedRotation.z, 
+    // shackleFullyOpenRotation.z, 
+    // shacklePartiallyOpenRotation.z
   ]);
   
   // Setup the animation function
@@ -965,9 +978,27 @@ const DataProtectionJourney: React.FC<DataProtectionJourneyProps> = ({
           timelineRef.current = null;
         }
         
-        // Kill ScrollTrigger instances
+        // Kill ScrollTrigger instances - be more specific to avoid conflicts
         if (typeof ScrollTrigger !== 'undefined') {
-          ScrollTrigger.getAll().forEach(trigger => trigger.kill());
+          // First kill any ScrollTrigger instances specifically tied to our container
+          ScrollTrigger.getAll().forEach(trigger => {
+            if (trigger.vars.trigger === `#${scrollContainerId}`) {
+              trigger.kill();
+            }
+          });
+          
+          // Then check for any orphaned ScrollTrigger instances created by this component
+          const allTriggers = ScrollTrigger.getAll();
+          if (allTriggers.length > 0) {
+            console.log(`Cleaning up ${allTriggers.length} remaining ScrollTrigger instances`);
+            allTriggers.forEach(trigger => {
+              // Only kill triggers that might be related to this component
+              // This is a safety measure to avoid killing triggers from other components
+              if (trigger.vars.id?.includes('dataJourney') || !trigger.vars.id) {
+                trigger.kill();
+              }
+            });
+          }
         }
         
         // Dispose of Three.js resources
