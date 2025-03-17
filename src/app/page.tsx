@@ -300,8 +300,8 @@ const scrollTriggerStore = {
       <section 
         id="hero-section"
         ref={dataJourneySectionRef}
-        className="flex flex-col items-center relative overflow-hidden"
-        style={{ minHeight: '100vh' }}> {/* Reduced height to minimize black space */}
+        className="flex flex-col items-center relative overflow-hidden pt-16 min-h-[80vh]"
+        style={{ minHeight: 'calc(100vh - 80px)' }}> {/* Consistent height with top padding for Safari */}
         <div className="absolute inset-0 bg-gradient-to-b from-black/80 via-black/50 to-black/30 z-0" />
         
         {/* Split Layout for Content and 3D Visualization */}
@@ -320,9 +320,9 @@ const scrollTriggerStore = {
           
           {/* Phase indicators removed to prevent unwanted bullet points on initial load */}
           
-          <div className="flex flex-col lg:flex-row items-center gap-8 lg:gap-12">
+          <div className="flex flex-col lg:flex-row items-center gap-8 lg:gap-12 w-full">
             {/* Text Content */}
-            <div ref={textContentRef} className="lg:w-2/5 text-left mb-8 lg:mb-0 order-first">
+            <div ref={textContentRef} className="lg:w-2/5 w-full text-left mb-8 lg:mb-0 order-first">
               <h1 className="text-5xl md:text-6xl font-bold leading-tight tracking-tight mb-6">
               <span className="block bg-gradient-to-r from-blue-400 to-cyan-400 bg-clip-text text-transparent">
                 Quantum-secure® 
@@ -366,7 +366,7 @@ const scrollTriggerStore = {
             </div>
             
             {/* 3D Visualization */}
-            <div ref={dataJourneyRef} className="lg:w-3/5 h-[600px] relative overflow-hidden rounded-2xl bg-gradient-to-br from-[#0c1929] to-black/80 border border-blue-900/20">
+            <div ref={dataJourneyRef} className="lg:w-3/5 w-full h-[600px] relative overflow-hidden rounded-2xl bg-gradient-to-br from-[#0c1929] to-black/80 border border-blue-900/20">
               <div className="absolute inset-0 bg-[radial-gradient(circle_at_center,rgba(59,130,246,0.1),transparent)] z-0" />
               <DataProtectionJourney scrollContainerId="hero-section" />
             </div>
@@ -377,7 +377,7 @@ const scrollTriggerStore = {
       </section>
 
       {/* QuantaMorphic® Technology Section - No 3D visualization here anymore */}
-      <section id="data-journey-section" className="py-20 relative animate-section bg-gradient-to-b from-black to-gray-900 mt-0 overflow-visible">
+      <section id="data-journey-section" className="py-20 pt-24 relative animate-section bg-gradient-to-b from-black to-gray-900 mt-0 overflow-visible min-h-[50vh]">
         <div className="container mx-auto px-4 overflow-visible">
           <div className="text-center mb-8 overflow-visible">
             <h2 className="text-3xl md:text-5xl font-bold mb-6 leading-snug bg-gradient-to-r from-blue-400 to-cyan-400 bg-clip-text text-transparent overflow-visible">
