@@ -7,11 +7,8 @@ import dynamic from 'next/dynamic';
 import Link from 'next/link';
 import { IndustryType } from '../components/Industry3DIcon';
 
-// Dynamically import Three.js components to avoid SSR issues
-const Navigation = dynamic(() => import('../components/Navigation'), {
-  ssr: false,
-  loading: () => <div className="h-20 bg-black" />
-});
+// Import Navigation directly to ensure it loads immediately without flickering
+import Navigation from '../components/Navigation';
 
 // Hero3D component - commented out as it's not currently used
 // const Hero3D = dynamic(() => import('../components/Hero3D'), {
@@ -23,10 +20,10 @@ const Navigation = dynamic(() => import('../components/Navigation'), {
 // This avoids React DOM reconciliation issues
 import DataProtectionJourney from '../components/DataProtectionJourney';
 
-// Dynamically import the IndustryIconsScene component
+// Dynamically import the IndustryIconsScene component with no loading fallback
 const IndustryIconsScene = dynamic(() => import('../components/IndustryIconsScene'), {
   ssr: false,
-  loading: () => <div className="w-full h-24 bg-transparent" />
+  loading: () => null
 });
 
 export default function Home() {
@@ -308,10 +305,10 @@ const scrollTriggerStore = {
         <div className="absolute inset-0 bg-gradient-to-b from-black/80 via-black/50 to-black/30 z-0" />
         
         {/* Split Layout for Content and 3D Visualization */}
-        <div className="container mx-auto px-4 z-10 pt-24 flex flex-col lg:flex-row items-start justify-between transition-all duration-700 ease-out">
+        <div className="container mx-auto px-4 z-10 pt-12 flex flex-col lg:flex-row items-start justify-between transition-all duration-700 ease-out">
           {/* Scroll indicator - Enhanced with higher z-index and auto-hide functionality */}
           <div 
-            className={`fixed bottom-8 left-1/2 transform -translate-x-1/2 flex flex-col items-center text-white z-50 scroll-indicator transition-opacity duration-500 ${hasScrolled ? 'opacity-0' : 'opacity-100'}`}
+            className={`fixed bottom-6 left-1/2 transform -translate-x-1/2 flex flex-col items-center text-white z-50 scroll-indicator transition-opacity duration-500 ${hasScrolled ? 'opacity-0' : 'opacity-100'}`}
           >
             <p className="mb-2 text-lg font-medium drop-shadow-lg">Scroll to see the journey</p>
             <div className="animate-bounce">
@@ -321,21 +318,7 @@ const scrollTriggerStore = {
             </div>
           </div>
           
-          {/* Phase indicators that appear during scroll */}
-          <div className="absolute left-8 top-1/2 transform -translate-y-1/2 flex flex-col space-y-16 z-20 hidden lg:block">
-            <div className="phase-item flex items-center space-x-3">
-              <div className="w-3 h-3 rounded-full bg-blue-400"></div>
-              <p className="text-blue-300 font-medium">Shrink</p>
-            </div>
-            <div className="phase-item flex items-center space-x-3">
-              <div className="w-3 h-3 rounded-full bg-orange-400"></div>
-              <p className="text-orange-300 font-medium">Shred</p>
-            </div>
-            <div className="phase-item flex items-center space-x-3">
-              <div className="w-3 h-3 rounded-full bg-green-400"></div>
-              <p className="text-green-300 font-medium">Secure</p>
-            </div>
-          </div>
+          {/* Phase indicators removed to prevent unwanted bullet points on initial load */}
           
           <div className="flex flex-col lg:flex-row items-center gap-8 lg:gap-12">
             {/* Text Content */}
@@ -365,18 +348,18 @@ const scrollTriggerStore = {
               </a>
             </div>
             
-            {/* Feature Labels */}
+            {/* Feature Labels - Using spans instead of p tags to avoid bullet points */}
             <div className="space-y-3">
               <div className="flex items-center">
-                <div className="w-2 h-2 rounded-full bg-blue-400 mr-3"></div>
+                <span className="inline-block w-2 h-2 rounded-full bg-blue-400 mr-3"></span>
                 <span className="text-blue-300">Shrink your data to reduce attack surface</span>
               </div>
               <div className="flex items-center">
-                <div className="w-2 h-2 rounded-full bg-orange-400 mr-3"></div>
+                <span className="inline-block w-2 h-2 rounded-full bg-orange-400 mr-3"></span>
                 <span className="text-orange-300">Shred into quantum-resistant fragments</span>
               </div>
               <div className="flex items-center">
-                <div className="w-2 h-2 rounded-full bg-green-400 mr-3"></div>
+                <span className="inline-block w-2 h-2 rounded-full bg-green-400 mr-3"></span>
                 <span className="text-green-300">Secure against quantum & AI threats</span>
               </div>
             </div>

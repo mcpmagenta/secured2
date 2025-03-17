@@ -4,11 +4,12 @@ import React, { useRef, useLayoutEffect, useState, useCallback, useEffect } from
 import * as THREE from 'three';
 import { gsap } from 'gsap';
 import { ScrollTrigger } from 'gsap/ScrollTrigger';
+import { MotionPathPlugin } from 'gsap/MotionPathPlugin';
 import { RoundedBoxGeometry } from 'three/examples/jsm/geometries/RoundedBoxGeometry.js';
 
-// Register the ScrollTrigger plugin
+// Register the GSAP plugins
 if (typeof window !== 'undefined') {
-  gsap.registerPlugin(ScrollTrigger);
+  gsap.registerPlugin(ScrollTrigger, MotionPathPlugin);
 }
 
 interface DataProtectionJourneyProps {
@@ -112,65 +113,77 @@ const DataProtectionJourney: React.FC<DataProtectionJourneyProps> = ({
     
     // Create ScrollTrigger for the animation timeline with simplified configuration
     // Use a safer configuration to prevent DOM insertion errors
-    // Wait for a small delay to ensure DOM is ready
-    setTimeout(() => {
-      // Clear any existing ScrollTrigger instances for this trigger
-      ScrollTrigger.getAll().forEach(st => {
-        if (st.vars.trigger === `#${scrollContainerId}`) {
-          st.kill();
+    // Initialize immediately without delay
+    
+    // Clear any existing ScrollTrigger instances for this trigger
+    ScrollTrigger.getAll().forEach(st => {
+      if (st.vars.trigger === `#${scrollContainerId}`) {
+        st.kill();
+      }
+    });
+    
+    // Create a new ScrollTrigger with safer configuration
+    ScrollTrigger.create({
+      id: `dataJourney-${scrollContainerId}`, // Add a specific ID for easier cleanup
+      trigger: `#${scrollContainerId}`,
+      start: 'top top', // Start immediately at the top
+      end: '+=150%', // Increase scroll distance for slower animation progression
+      scrub: 3, // Increase scrub value for smoother, slower transitions
+      pin: false, // Don't pin here to avoid conflicts
+      anticipatePin: 1, // Improves performance
+      markers: false, // Set to true for debugging
+      onLeaveBack: (self) => {
+        // Ensure animation is reset when scrolling back to the top
+        if (self.progress < 0.1) {
+          tl.progress(0);
         }
-      });
-      
-      // Create a new ScrollTrigger with safer configuration
-      ScrollTrigger.create({
-        id: `dataJourney-${scrollContainerId}`, // Add a specific ID for easier cleanup
-        trigger: `#${scrollContainerId}`,
-        start: 'top top', // Start immediately at the top
-        end: '+=150%', // Increase scroll distance for slower animation progression
-        scrub: 3, // Increase scrub value for smoother, slower transitions
-        pin: false, // Don't pin here to avoid conflicts
-        anticipatePin: 1, // Improves performance
-        markers: false, // Set to true for debugging
-        onLeaveBack: (self) => {
-          // Ensure animation is reset when scrolling back to the top
-          if (self.progress < 0.1) {
-            tl.progress(0);
-          }
-        },
-        onUpdate: (self) => {
-          // Update scroll progress for progress bar (0-100)
-          setScrollProgress(Math.round(self.progress * 100));
-          
-          // Update current stage based on progress with adjusted boundaries
-          // Shrink phase: 0-35%, Shred phase: 35-70%, Secure phase: 70-100%
-          if (self.progress < 0.35) {
-            setCurrentStage('shrink');
-          } else if (self.progress < 0.70) {
-            setCurrentStage('shred');
-          } else {
-            // Secure stage goes all the way to 100%
-            setCurrentStage('secure');
-          }
-          
-          // Make sure the animation is still running
-          if (rendererRef.current && sceneRef.current && cameraRef.current) {
-            rendererRef.current.render(sceneRef.current, cameraRef.current);
-          }
-          
-          // Update the timeline based on scroll progress
-          // This is the key part - the timeline controls all animations
-          tl.progress(self.progress);
+      },
+      onUpdate: (self) => {
+        // Update scroll progress for progress bar (0-100)
+        setScrollProgress(Math.round(self.progress * 100));
+        
+        // Update current stage based on progress with adjusted boundaries
+        // Shrink phase: 0-35%, Shred phase: 35-70%, Secure phase: 70-100%
+        if (self.progress < 0.35) {
+          setCurrentStage('shrink');
+        } else if (self.progress < 0.70) {
+          setCurrentStage('shred');
+        } else {
+          // Secure stage goes all the way to 100%
+          setCurrentStage('secure');
         }
-      });
-    }, 100); // Small delay to ensure DOM is ready
+        
+        // Make sure the animation is still running
+        if (rendererRef.current && sceneRef.current && cameraRef.current) {
+          rendererRef.current.render(sceneRef.current, cameraRef.current);
+        }
+        
+        // Update the timeline based on scroll progress
+        // This is the key part - the timeline controls all animations
+        tl.progress(self.progress);
+      }
+    });
     
     // ===== MASTER TIMELINE SETUP =====
     // This single timeline will control all animations based on scroll position
     
-    // 1. Initial state setup - make all groups visible but control with opacity
-    tl.set(dataGroupRef.current, { opacity: 1, visible: true }, 0);
-    tl.set(shredGroupRef.current, { opacity: 0, visible: false }, 0); // Ensure shred particles are completely hidden until 30%
-    tl.set(secureGroupRef.current, { opacity: 0.2, visible: true }, 0); // Lock visible but even more subtle during Shrink stage
+    // 1. Initial state setup - make all groups visible but control with visibility
+    tl.set(dataGroupRef.current, { visible: true }, 0);
+    tl.set(shredGroupRef.current, { visible: false }, 0); // Ensure shred particles are completely hidden until 40%
+    tl.set(secureGroupRef.current, { visible: true }, 0); // Lock visible during Shrink stage
+    
+    // Set initial opacity for all child meshes in each group
+    dataGroupRef.current?.children.forEach(child => {
+      if (child instanceof THREE.Mesh && child.material) {
+        gsap.set(child.material, { opacity: 1 });
+      }
+    });
+    
+    secureGroupRef.current?.children.forEach(child => {
+      if (child instanceof THREE.Mesh && child.material) {
+        gsap.set(child.material, { opacity: 0.2 });
+      }
+    });
     
     // Camera animations for more dynamic experience
     if (cameraRef.current) {
@@ -297,21 +310,36 @@ const DataProtectionJourney: React.FC<DataProtectionJourneyProps> = ({
     
     // ===== TRANSITION: SHRINK TO SHRED (at 40% of timeline) =====
     if (dataGroup && shredGroup && secureGroup) {
-      // Start fading out data group at 35% mark and complete by 40%
-      tl.to(dataGroup, { 
-        opacity: 0, 
-        duration: 0.3, // Extended duration for smoother transition
-        ease: 'sine.inOut' // Gentler easing
-      }, 0.38); // Start fade out at 38% to complete by 40%
+      // Start fading out data group materials at 35% mark and complete by 40%
+      dataGroup.children.forEach(child => {
+        if (child instanceof THREE.Mesh && child.material) {
+          tl.to(child.material, { 
+            opacity: 0, 
+            duration: 0.3, // Extended duration for smoother transition
+            ease: 'sine.inOut' // Gentler easing
+          }, 0.38); // Start fade out at 38% to complete by 40%
+        }
+      });
       
-      // Make shred group visible and fade in ONLY after data is fully invisible at 40% mark
-      // Ensure shred group is completely hidden before this point
-      tl.set(shredGroup, { visible: true, opacity: 0 }, 0.40); // Explicitly set both visibility and opacity at 40%
-      tl.to(shredGroup, { 
-        opacity: 1, 
-        duration: 0.3, // Extended duration for smoother transition
-        ease: 'sine.inOut' // Gentler easing
-      }, 0.40); // Delayed timing to 40%
+      // Hide data group after fade out completes
+      tl.set(dataGroup, { visible: false }, 0.40);
+      
+      // Make shred group visible at 40% mark
+      tl.set(shredGroup, { visible: true }, 0.40);
+      
+      // Set initial opacity for shred group materials
+      shredGroup.children.forEach(child => {
+        if (child instanceof THREE.Mesh && child.material) {
+          // Set initial opacity to 0
+          tl.set(child.material, { opacity: 0 }, 0.40);
+          // Then fade in
+          tl.to(child.material, { 
+            opacity: 1, 
+            duration: 0.3, // Extended duration for smoother transition
+            ease: 'sine.inOut' // Gentler easing
+          }, 0.40); // Delayed timing to 40%
+        }
+      });
       
       // STAGE 1: SHRINK (0-40%)
       // Padlock is present but fully unlocked from the beginning
@@ -324,21 +352,26 @@ const DataProtectionJourney: React.FC<DataProtectionJourneyProps> = ({
         // No animation needed here as we maintain the open state throughout this phase
       }
       
-      // Adjust lock visibility throughout the journey
+      // Adjust lock visibility throughout the journey by animating child materials
       // During shrink phase (0-40%), lock is visible but not dominant
-      tl.set(secureGroup, { opacity: 0.6, visible: true }, 0);
-      
-      // During shred phase (40-80%), make lock more visible
-      tl.to(secureGroup, {
-        opacity: 0.8, // More visible as it becomes the focus
-        duration: 0.3
-      }, 0.40);
-      
-      // During secure phase (80-100%), make lock fully visible and prominent
-      tl.to(secureGroup, {
-        opacity: 1.0, // Fully visible as the main focus
-        duration: 0.3
-      }, 0.80);
+      secureGroup.children.forEach(child => {
+        if (child instanceof THREE.Mesh && child.material) {
+          // Set initial opacity during shrink phase
+          tl.set(child.material, { opacity: 0.6 }, 0);
+          
+          // During shred phase (40-80%), make lock more visible
+          tl.to(child.material, {
+            opacity: 0.8, // More visible as it becomes the focus
+            duration: 0.3
+          }, 0.40);
+          
+          // During secure phase (80-100%), make lock fully visible and prominent
+          tl.to(child.material, {
+            opacity: 1.0, // Fully visible as the main focus
+            duration: 0.3
+          }, 0.80);
+        }
+      });
     }
     
     // ===== STAGE 2: SHRED (40-80% of timeline) =====
@@ -362,14 +395,26 @@ const DataProtectionJourney: React.FC<DataProtectionJourneyProps> = ({
           delay: delay // Staggered delay
         }, 0.40); // Start at 40%
         
-        // Rotate particles more dramatically
-        tl.to(particle.rotation, {
-          x: Math.random() * Math.PI * 4, // More rotation
-          y: Math.random() * Math.PI * 4, // More rotation
-          z: Math.random() * Math.PI * 4, // More rotation
+        // Rotate particles more dramatically using a proxy object
+        const rotationValues = {
+          x: particle.rotation.x,
+          y: particle.rotation.y,
+          z: particle.rotation.z,
+          targetX: Math.random() * Math.PI * 4, // Store target values
+          targetY: Math.random() * Math.PI * 4,
+          targetZ: Math.random() * Math.PI * 4
+        };
+        
+        tl.to(rotationValues, {
+          x: rotationValues.targetX, // More rotation
+          y: rotationValues.targetY, // More rotation
+          z: rotationValues.targetZ, // More rotation
           duration: 0.5, // Match position animation
           ease: 'power2.inOut',
-          delay: delay // Staggered delay
+          delay: delay, // Staggered delay
+          onUpdate: () => {
+            particle.rotation.set(rotationValues.x, rotationValues.y, rotationValues.z);
+          }
         }, 0.40); // Start at 40%
       });
     }
@@ -430,11 +475,35 @@ const DataProtectionJourney: React.FC<DataProtectionJourneyProps> = ({
           alignOrigin: [0.5, 0.5, 0.5] // Center alignment
         };
         
-        // Animate particle along spiral path with more dynamic easing
-        tl.to(particle, {
+        // Create a proxy object for the particle position
+        const positionProxy = {
+          x: particle.position.x,
+          y: particle.position.y,
+          z: particle.position.z
+        };
+        
+        // Create a proxy object for the particle rotation
+        const rotationProxy = {
+          x: particle.rotation.x,
+          y: particle.rotation.y,
+          z: particle.rotation.z
+        };
+        
+        // Animate along spiral path with more dynamic easing using proxies
+        tl.to(positionProxy, {
           motionPath: motionPath,
           duration: convergeDuration,
           ease: "power3.in", // Sharper acceleration toward the end
+          onUpdate: () => {
+            // Update position
+            particle.position.set(positionProxy.x, positionProxy.y, positionProxy.z);
+            
+            // If autoRotate is enabled, we need to manually update rotation
+            // based on the motion path direction
+            if (motionPath.autoRotate) {
+              particle.rotation.set(rotationProxy.x, rotationProxy.y, rotationProxy.z);
+            }
+          }
         }, startTime);
         
         // Scale particles down as they converge using proxy object
@@ -465,71 +534,82 @@ const DataProtectionJourney: React.FC<DataProtectionJourneyProps> = ({
           }, startTime);
         }
         
-        // Increase speed of rotation as they converge
-        tl.to(particle.rotation, {
-          x: particle.rotation.x + Math.PI * 6, // More rotations
-          y: particle.rotation.y + Math.PI * 6,
-          z: particle.rotation.z + Math.PI * 6,
+        // Increase speed of rotation as they converge using a proxy object
+        const rotationValues = {
+          x: particle.rotation.x,
+          y: particle.rotation.y,
+          z: particle.rotation.z
+        };
+        
+        tl.to(rotationValues, {
+          x: rotationValues.x + Math.PI * 6, // More rotations
+          y: rotationValues.y + Math.PI * 6,
+          z: rotationValues.z + Math.PI * 6,
           duration: convergeDuration,
           ease: 'power2.in',
+          onUpdate: () => {
+            particle.rotation.set(rotationValues.x, rotationValues.y, rotationValues.z);
+          }
         }, startTime);
       });
       
-      // Enhanced glow effect when particles converge into the lock
-      const glowGeometry = new THREE.SphereGeometry(0.4, 24, 24); // Slightly larger, smoother glow
-      const glowMaterial = new THREE.MeshBasicMaterial({
-        color: 0x10b981, // Green color matching the secure stage
-        transparent: true,
-        opacity: 0
-      });
-      const glow = new THREE.Mesh(glowGeometry, glowMaterial);
-      glow.position.y = 0.5; // Position at lock shackle
-      secureGroup.add(glow);
+      // Removed glow effect when particles converge into the lock
+      // const glowGeometry = new THREE.SphereGeometry(0.4, 24, 24); // Slightly larger, smoother glow
+      // const glowMaterial = new THREE.MeshBasicMaterial({
+      //   color: 0x10b981, // Green color matching the secure stage
+      //   transparent: true,
+      //   opacity: 0
+      // });
+      // const glow = new THREE.Mesh(glowGeometry, glowMaterial);
+      // glow.position.y = 0.5; // Position at lock shackle
+      // secureGroup.add(glow);
       
-      // Create a spark/flash effect for when the lock closes
-      const sparkGeometry = new THREE.SphereGeometry(0.15, 16, 16);
-      const sparkMaterial = new THREE.MeshBasicMaterial({
-        color: 0xffffff,
-        transparent: true,
-        opacity: 0
-      });
-      const spark = new THREE.Mesh(sparkGeometry, sparkMaterial);
-      spark.position.set(0, 0.5, 0); // Position at lock shackle
-      secureGroup.add(spark);
+      // Removed large spark/flash effect that was creating the white circle
+      // const sparkGeometry = new THREE.SphereGeometry(0.15, 16, 16);
+      // const sparkMaterial = new THREE.MeshBasicMaterial({
+      //   color: 0xffffff,
+      //   transparent: true,
+      //   opacity: 0
+      // });
+      // const spark = new THREE.Mesh(sparkGeometry, sparkMaterial);
+      // spark.position.set(0, 0.5, 0); // Position at lock shackle
+      // secureGroup.add(spark);
       
       // STAGE 2: SHRED (40-80%)
       // During the shred phase, the shackle gradually starts to move toward closed position
-      // Start moving from fully open toward partially closed at 40%
-      tl.to(lockShackleRef.current.rotation, {
-        x: shacklePartiallyOpenRotation.x, // Move to partially closed rotation
-        duration: 1.0, // Slower, more gradual movement throughout the shred phase
-        ease: 'power1.inOut' // Smoother easing for natural movement
-      }, 0.40); // Start at 40% of the timeline
-      
-      // Add gradual sliding motion during the shred phase
-      tl.to(lockShackleRef.current.position, {
-        y: shacklePartiallyOpenPosition.y, // Move to partially slid down
-        duration: 1.0, // Match rotation duration
-        ease: 'power1.inOut' // Match rotation easing
-      }, 0.40); // Same timing as rotation
+      // Removed intermediate animations to keep lock fully open until secure stage
+      // Lock will remain in fully open position until the secure stage at 70%
       
       // STAGE 3: SECURE (70-100%)
-      // Final closing sequence with dramatic finish and click/bounce effect
-      // Complete the closing motion at 70% instead of 80%
-      tl.to(lockShackleRef.current.rotation, {
-        x: shackleClosedRotation.x, // Fully closed rotation
-        duration: 0.5, // Longer duration for more visible closing motion
-        ease: 'back.out(1.5)', // Bounce effect for emphasis
-        overwrite: 'auto' // Ensure this overrides any previous animations
-      }, 0.70); // Start at 70% of the timeline to lock earlier
+      // Direct animation from fully open to fully closed in one motion at the secure stage
+      // Add null check for lockShackleRef.current
+      if (lockShackleRef.current) {
+        const shackleRotation = {
+          x: shackleFullyOpenRotation.x // Start from fully open position
+        };
+        
+        tl.to(shackleRotation, {
+          x: shackleClosedRotation.x, // Animate directly to fully closed rotation
+          duration: 0.5, // Quick, dramatic closing motion
+          ease: 'back.out(1.5)', // Bounce effect for emphasis
+          overwrite: 'auto', // Ensure this overrides any previous animations
+          onUpdate: () => {
+            if (lockShackleRef.current) {
+              lockShackleRef.current.rotation.x = shackleRotation.x;
+            }
+          }
+        }, 0.70); // Start at 70% of the timeline (beginning of secure stage)
+      }
       
-      // Complete sliding motion to fully closed position
-      tl.to(lockShackleRef.current.position, {
-        y: shackleClosedPosition.y, // Fully slid down into lock
-        duration: 0.5, // Match rotation duration
-        ease: 'back.out(1.5)', // Match rotation easing with bounce
-        overwrite: 'auto' // Ensure this overrides any previous animations
-      }, 0.70); // Same timing as rotation
+      // Direct animation from fully open to fully closed position
+      if (lockShackleRef.current) {
+        tl.to(lockShackleRef.current.position, {
+          y: shackleClosedPosition.y, // Animate directly to fully closed position
+          duration: 0.5, // Match rotation duration
+          ease: 'back.out(1.5)', // Match rotation easing with bounce
+          overwrite: 'auto' // Ensure this overrides any previous animations
+        }, 0.70); // Same timing as rotation
+      }
       
       // Add a more pronounced bounce at the moment the lock closes
       // Use a proxy object for scale animation to avoid read-only property error
@@ -584,19 +664,50 @@ const DataProtectionJourney: React.FC<DataProtectionJourneyProps> = ({
       ) as THREE.Mesh;
       
       if (sparkMesh && sparkMesh.material instanceof THREE.Material) {
-        tl.to(sparkMesh, {
-          opacity: 1, // Fully visible
-          scale: 2.0, // Larger for more dramatic effect
+        // Create proxy objects for scale animations - using much smaller values
+        const sparkScaleProxy1 = { value: 0.5 }; // Start smaller
+        const sparkScaleProxy2 = { value: 0.8 }; // Grow less
+        
+        // First animation - grow and show, but with much lower opacity
+        tl.set(sparkMesh.material, { opacity: 0 }, 0.75);
+        tl.to(sparkMesh.material, {
+          opacity: 0.6, // Reduced opacity to make it less noticeable
           duration: 0.05, // Very quick flash
           ease: 'power4.out' // Sharp easing for a bright flash
         }, 0.75); // Moved earlier to match lock closing at 70%
         
-        tl.to(sparkMesh, {
+        tl.to(sparkScaleProxy1, {
+          value: 0.8, // Much smaller maximum scale
+          duration: 0.05,
+          ease: 'power4.out',
+          onUpdate: () => {
+            sparkMesh.scale.set(
+              sparkScaleProxy1.value,
+              sparkScaleProxy1.value,
+              sparkScaleProxy1.value
+            );
+          }
+        }, 0.75);
+        
+        // Second animation - shrink and fade
+        tl.to(sparkMesh.material, {
           opacity: 0,
-          scale: 0.5,
-          duration: 0.2,
+          duration: 0.1, // Faster fade out
           ease: 'power2.in'
         }, 0.76); // Fade out quickly
+        
+        tl.to(sparkScaleProxy2, {
+          value: 0.2, // Shrink more
+          duration: 0.1, // Faster shrink
+          ease: 'power2.in',
+          onUpdate: () => {
+            sparkMesh.scale.set(
+              sparkScaleProxy2.value,
+              sparkScaleProxy2.value,
+              sparkScaleProxy2.value
+            );
+          }
+        }, 0.76);
       }
       
       // Add glow effect after lock is secured
@@ -607,12 +718,9 @@ const DataProtectionJourney: React.FC<DataProtectionJourneyProps> = ({
         child.geometry.parameters.radius === 1.2
       ) as THREE.Mesh;
       
+      // Set a fixed opacity for the lock glow instead of animating it
       if (lockGlowMesh && lockGlowMesh.material instanceof THREE.Material) {
-        tl.to(lockGlowMesh.material, {
-          opacity: 0.2, // Subtle but noticeable glow
-          duration: 0.5, // Gradual increase
-          ease: 'sine.inOut'
-        }, 0.77); // Moved earlier to match lock closing at 70%
+        lockGlowMesh.material.opacity = 0.3; // Fixed moderate opacity
       }
       
       // Enhance lock material when secure - start exactly when lock closes
@@ -620,7 +728,7 @@ const DataProtectionJourney: React.FC<DataProtectionJourneyProps> = ({
       if (lockShackleRef.current instanceof THREE.Mesh && 
           lockShackleRef.current.material instanceof THREE.Material) {
         tl.to(lockShackleRef.current.material, {
-          emissiveIntensity: 1.5, // Stronger glow when secure
+          emissiveIntensity: 1.2, // Reduced from 1.5 to 1.2 for a more balanced glow
           opacity: 1,
           duration: 0.2,
           overwrite: 'auto' // Ensure this overrides any previous animations
@@ -629,37 +737,62 @@ const DataProtectionJourney: React.FC<DataProtectionJourneyProps> = ({
       
       // We already have a spark effect at 0.85, so we'll remove this duplicate effect
       
-      // Enhanced glow effect at convergence point
-      // Find glow in the secureGroup
-      const glowMesh = secureGroup?.children.find(child => 
-        child instanceof THREE.Mesh && 
-        child.geometry instanceof THREE.SphereGeometry && 
-        child.geometry.parameters.radius === 0.8
-      ) as THREE.Mesh;
-      
-      if (glowMesh && glowMesh.material instanceof THREE.Material) {
-        tl.to(glowMesh.material, {
-          opacity: 0.8, // Stronger glow for more dramatic effect
-          duration: 0.2,
-          ease: 'sine.in'
-        }, 0.78); // Moved earlier to match lock closing at 70%
+      // Add a very subtle green glow to the lock shackle during transition to secure stage
+      if (lockShackleRef.current && lockShackleRef.current instanceof THREE.Mesh && lockShackleRef.current.material) {
+        // Set initial state
+        tl.set(lockShackleRef.current.material, {
+          emissive: new THREE.Color(0x10b981), // Green color matching the secure stage
+          emissiveIntensity: 0.0 // Start with no glow
+        }, 0.65); // Just before secure phase
         
-        tl.to(glowMesh.material, {
-          opacity: 0,
-          duration: 0.2, // Shortened duration
-          ease: 'sine.out'
-        }, 0.82); // Fade out earlier to complete the animation sooner
+        // Gradually increase the glow during transition
+        tl.to(lockShackleRef.current.material, {
+          emissiveIntensity: 0.6, // Subtle glow
+          duration: 0.2,
+          ease: 'sine.inOut'
+        }, 0.65);
+        
+        // Then reduce it to a very subtle level
+        tl.to(lockShackleRef.current.material, {
+          emissiveIntensity: 0.3, // Maintain a very subtle glow
+          duration: 0.3,
+          ease: 'power1.out'
+        }, 0.85);
       }
       
-      // Hide shred group after convergence - moved earlier to 75% to complete the transition sooner
-      tl.set(shredGroup, { opacity: 0, visible: false }, 0.75); // Right after lock closes
+      // Make shredded data disappear more smoothly as it approaches the secure stage
+      // Start fading out particles during the shred stage and complete by secure stage
+      shredGroup.children.forEach((child, index) => {
+        if (child instanceof THREE.Mesh && child.material) {
+          // Start fading earlier in the timeline (around 50-60% mark)
+          // This creates a smoother transition as we approach the secure stage
+          const startTime = 0.5 + (Math.random() * 0.1);
+          
+          // Use a longer duration for a very gradual fade that completes as we reach secure
+          tl.to(child.material, { 
+            opacity: 0, 
+            duration: 0.5, // Longer duration for an even more gradual fade
+            ease: 'power1.inOut' // Smoother easing for natural disappearance
+          }, startTime);
+        }
+      });
       
-      // Fade in secure group with lock - start just before secure phase
-      tl.to(secureGroup, { 
-        opacity: 1, 
-        duration: 0.3, // Extended duration for smoother fade
-        ease: 'sine.inOut' // Gentler easing
-      }, 0.68); // Start just before secure phase at 70%
+      // Then hide the group entirely once we're in the secure stage
+      tl.set(shredGroup, { visible: false }, 0.82); // Just after all fades complete
+      
+      // Fade in secure group materials with staggered timing for a more gradual and natural transition
+      secureGroup.children.forEach((child, index) => {
+        if (child instanceof THREE.Mesh && child.material) {
+          // Calculate a staggered start time between 0.68 and 0.78
+          const staggeredStart = 0.68 + (index % 5) * 0.02;
+          
+          tl.to(child.material, { 
+            opacity: 1, 
+            duration: 0.4, // Extended duration for smoother fade
+            ease: 'power2.inOut' // More refined easing for a professional look
+          }, staggeredStart);
+        }
+      });
       
       // Click effect is now handled above with the lock closing animation
     }
@@ -671,10 +804,18 @@ const DataProtectionJourney: React.FC<DataProtectionJourneyProps> = ({
       
       // Very minimal rotation to maintain upright orientation
       // Just enough to add subtle 3D interest without flipping upside down
-      tl.to(secureGroup.rotation, {
+      // Use a proxy object for rotation animation
+      const secureGroupRotation = {
+        y: secureGroup.rotation.y
+      };
+      
+      tl.to(secureGroupRotation, {
         y: Math.PI * 0.05, // Even more minimal rotation (about 9 degrees) to keep padlock upright
         duration: 0.15, // Shortened duration
-        ease: 'sine.inOut' // Gentler easing
+        ease: 'sine.inOut', // Gentler easing
+        onUpdate: () => {
+          secureGroup.rotation.y = secureGroupRotation.y;
+        }
       }, 0.75); // Moved earlier to happen after lock closes at 70%
       
       // Pulse the emission intensity for a "secure" effect
@@ -689,18 +830,8 @@ const DataProtectionJourney: React.FC<DataProtectionJourneyProps> = ({
           const material = element.material;
           const initialIntensity = material.emissiveIntensity || 1.0;
           
-          // Start with normal intensity
-          tl.set(material, { emissiveIntensity: initialIntensity }, 0.7);
-          
-          // Pulse the glow during the secure stage
-          tl.to(material, {
-            emissiveIntensity: initialIntensity * 1.5,
-            duration: 0.1, // Shortened duration for quicker pulse
-            yoyo: true,
-            repeat: 1, // Pulse once
-            ease: 'sine.inOut',
-            overwrite: 'auto' // Ensure this overrides any previous animations
-          }, 0.7); // Keep at 70% to coincide with lock closing
+          // Removed all GSAP animations that affect emissiveIntensity
+          // The material will maintain its initial emissive intensity throughout
         }
       });
     }
@@ -872,9 +1003,9 @@ const DataProtectionJourney: React.FC<DataProtectionJourneyProps> = ({
     orangeLight.position.set(3, -1, 2);
     scene.add(orangeLight);
     
-    // Green accent light for the secure stage
-    const greenLight = new THREE.PointLight(0x00ff88, 2, 10);
-    greenLight.position.set(-3, -2, -3);
+    // Modified green accent light for the secure stage - reduced intensity and moved further away
+    const greenLight = new THREE.PointLight(0x20ffb0, 0.8, 15); // Lighter color, much lower intensity, and greater distance
+    greenLight.position.set(-5, -3, -5); // Positioned further away to reduce circular effect
     scene.add(greenLight);
     
     // Subtle fog for depth - reduced density for better visibility
@@ -931,20 +1062,24 @@ const DataProtectionJourney: React.FC<DataProtectionJourneyProps> = ({
       }
     };
     
-    // Force multiple initial renders to ensure visibility
+    // Force immediate rendering to ensure visibility without delays
     if (rendererRef.current && sceneRef.current && cameraRef.current && canvasRef.current) {
       try {
-        // Render multiple times to ensure the scene is properly initialized
-        for (let i = 0; i < 5; i++) {
-          rendererRef.current.render(sceneRef.current, cameraRef.current);
-        }
+        // Render immediately with high priority
+        rendererRef.current.render(sceneRef.current, cameraRef.current);
+        // Request an immediate animation frame for the next render
+        requestAnimationFrame(() => {
+          if (rendererRef.current && sceneRef.current && cameraRef.current) {
+            rendererRef.current.render(sceneRef.current, cameraRef.current);
+          }
+        });
         
         // Start animation loop only if component is still mounted
         if (canvasRef.current) {
           animate();
           
-          // Set up an interval to ensure animation keeps running
-          const animationCheckInterval = setInterval(ensureAnimationIsRunning, 1000);
+          // Set up an interval to ensure animation keeps running with minimal delay
+          const animationCheckInterval = setInterval(ensureAnimationIsRunning, 200);
           
           // Clean up interval on component unmount
           return () => {
@@ -1482,32 +1617,31 @@ const DataProtectionJourney: React.FC<DataProtectionJourneyProps> = ({
       ease: "sine.inOut"
     });
     
-    // Add a more pronounced glow effect for the secure stage
-    // Create a glow effect for the lock
-    const lockGlowGeometry = new THREE.SphereGeometry(1.2, 32, 32);
-    const lockGlowMaterial = new THREE.MeshBasicMaterial({
-      color: lockBodyColor, // Match the lock body color
-      transparent: true,
-      opacity: 0.0, // Start with invisible glow
-      side: THREE.BackSide
-    });
-    const lockGlow = new THREE.Mesh(lockGlowGeometry, lockGlowMaterial);
-    lockGlow.position.set(0, 0, -0.8); // Position behind the lock
+    // Removed the large green circle behind the padlock
+    // const lockGlowGeometry = new THREE.SphereGeometry(1.2, 32, 32);
+    // const lockGlowMaterial = new THREE.MeshBasicMaterial({
+    //   color: 0x20e8ac, // Light green color matching our theme
+    //   transparent: true,
+    //   opacity: 0.3, // Fixed opacity that remains constant
+    //   side: THREE.BackSide
+    // });
+    // const lockGlow = new THREE.Mesh(lockGlowGeometry, lockGlowMaterial);
+    // lockGlow.position.set(0, 0, -0.8); // Position behind the lock
     
-    // Create a general glow effect for the convergence point
-    const glowGeometry = new THREE.SphereGeometry(0.8, 24, 24);
-    const glowMaterial = new THREE.MeshBasicMaterial({
-      color: 0x00ffff, // Cyan color for distinct effect
-      transparent: true,
-      opacity: 0.0, // Start invisible
-      side: THREE.BackSide
-    });
-    const glow = new THREE.Mesh(glowGeometry, glowMaterial);
-    glow.position.copy(lock.position); // Position at the lock
-    secureGroup.add(glow); // Add to the secure group
+    // Removed the general glow effect that was creating the green circle
+    // const glowGeometry = new THREE.SphereGeometry(0.8, 24, 24);
+    // const glowMaterial = new THREE.MeshBasicMaterial({
+    //   color: 0x20e8ac, // Light green color matching our theme
+    //   transparent: true,
+    //   opacity: 0.25, // Fixed opacity that remains constant
+    //   side: THREE.BackSide
+    // });
+    // const glow = new THREE.Mesh(glowGeometry, glowMaterial);
+    // glow.position.copy(lock.position); // Position at the lock
+    // secureGroup.add(glow); // Add to the secure group
     
-    // Add a spark effect for when the lock closes
-    const sparkGeometry = new THREE.SphereGeometry(0.05, 16, 16);
+    // Add a tiny spark effect for when the lock closes
+    const sparkGeometry = new THREE.SphereGeometry(0.02, 12, 12); // Much smaller spark with fewer segments
     const sparkMaterial = new THREE.MeshBasicMaterial({
       color: 0xffffff,
       transparent: true,
@@ -1516,65 +1650,64 @@ const DataProtectionJourney: React.FC<DataProtectionJourneyProps> = ({
     const spark = new THREE.Mesh(sparkGeometry, sparkMaterial);
     spark.position.set(postSpacing/2, lockBodyHeight/2, lockBodyDepth/2); // Position at the right hole
     lockBody.add(spark);
-    // Add the lockGlow to the lock
-    lock.add(lockGlow);
+    // Removed the lockGlow from the lock
+    // lock.add(lockGlow);
     
     secureGroup.add(lock);
     
-    // Add minimal inner glow sphere
-    const innerGlowGeometry = new THREE.SphereGeometry(0.7, 32, 32);
-    const innerGlowMaterial = new THREE.MeshBasicMaterial({
-      color: 0x00ff88,
-      transparent: true,
-      opacity: 0.04, // Even lower opacity
-      side: THREE.BackSide
-    });
-    const innerGlow = new THREE.Mesh(innerGlowGeometry, innerGlowMaterial);
-    secureGroup.add(innerGlow);
+    // Removed inner glow sphere that was creating the green circle
+    // const innerGlowGeometry = new THREE.SphereGeometry(0.7, 32, 32);
+    // const innerGlowMaterial = new THREE.MeshBasicMaterial({
+    //   color: 0x20ffb0, // Lighter green color
+    //   transparent: true,
+    //   opacity: 0.04, // Even lower opacity
+    //   side: THREE.BackSide
+    // });
+    // const innerGlow = new THREE.Mesh(innerGlowGeometry, innerGlowMaterial);
+    // secureGroup.add(innerGlow);
     
-    // Add middle glow sphere layer
-    const middleGlowGeometry = new THREE.SphereGeometry(1.3, 32, 32);
-    const middleGlowMaterial = new THREE.MeshBasicMaterial({
-      color: 0x10b981,
-      transparent: true,
-      opacity: 0.2,
-      side: THREE.BackSide
-    });
+    // Removed middle glow sphere that was creating the green circle
+    // const middleGlowGeometry = new THREE.SphereGeometry(0.3, 32, 32);
+    // const middleGlowMaterial = new THREE.MeshBasicMaterial({
+    //   color: 0x20e8ac, // Lighter green color
+    //   transparent: true,
+    //   opacity: 0.2,
+    //   side: THREE.BackSide
+    // });
+    // 
+    // const middleGlow = new THREE.Mesh(middleGlowGeometry, middleGlowMaterial);
+    // secureGroup.add(middleGlow);
     
-    const middleGlow = new THREE.Mesh(middleGlowGeometry, middleGlowMaterial);
-    secureGroup.add(middleGlow);
+    // Removed outer glow sphere that was creating a green circle overlay
+    // const outerGlowGeometry = new THREE.SphereGeometry(1.5, 32, 32);
+    // const outerGlowMaterial = new THREE.MeshBasicMaterial({
+    //   color: 0x20e8ac, // Lighter green color
+    //   transparent: true,
+    //   opacity: 0.1,
+    //   side: THREE.BackSide
+    // });
+    // 
+    // const outerGlow = new THREE.Mesh(outerGlowGeometry, outerGlowMaterial);
+    // secureGroup.add(outerGlow);
     
-    // Add outer pulse effect
-    const outerGlowGeometry = new THREE.SphereGeometry(1.5, 32, 32);
-    const outerGlowMaterial = new THREE.MeshBasicMaterial({
-      color: 0x10b981,
-      transparent: true,
-      opacity: 0.1,
-      side: THREE.BackSide
-    });
-    
-    const outerGlow = new THREE.Mesh(outerGlowGeometry, outerGlowMaterial);
-    secureGroup.add(outerGlow);
-    
-    // Animate the outer glow
-    // Use a proxy object to avoid the read-only scale property error
-    const outerGlowScaleProxy = { x: 1, y: 1, z: 1 };
-    gsap.to(outerGlowScaleProxy, {
-      x: 1.2, y: 1.2, z: 1.2,
-      duration: 2,
-      repeat: -1,
-      yoyo: true,
-      ease: "sine.inOut",
-      onUpdate: () => {
-        if (outerGlow) {
-          outerGlow.scale.set(
-            outerGlowScaleProxy.x,
-            outerGlowScaleProxy.y,
-            outerGlowScaleProxy.z
-          );
-        }
-      }
-    });
+    // Removed animation for the outer glow
+    // const outerGlowScaleProxy = { x: 1, y: 1, z: 1 };
+    // gsap.to(outerGlowScaleProxy, {
+    //   x: 1.2, y: 1.2, z: 1.2,
+    //   duration: 2,
+    //   repeat: -1,
+    //   yoyo: true,
+    //   ease: "sine.inOut",
+    //   onUpdate: () => {
+    //     if (outerGlow) {
+    //       outerGlow.scale.set(
+    //         outerGlowScaleProxy.x,
+    //         outerGlowScaleProxy.y,
+    //         outerGlowScaleProxy.z
+    //       );
+    //     }
+    //   }
+    // });
     
     // Add orbiting particles for dynamic effect - more particles and variety
     const orbitCount = 12; // Increased count
@@ -1586,15 +1719,15 @@ const DataProtectionJourney: React.FC<DataProtectionJourneyProps> = ({
       new THREE.TetrahedronGeometry(0.12)
     ];
     
-    // Enhanced material with stronger glow
+    // Enhanced material with a more subtle glow
     const orbitMaterial = new THREE.MeshPhysicalMaterial({
-      color: 0x34d399,
-      emissive: 0x00ffaa,
-      emissiveIntensity: 1.5,
-      metalness: 0.8,
-      roughness: 0.2,
-      reflectivity: 1.0,
-      clearcoat: 0.5
+      color: 0x4adeb0, // Lighter green color
+      emissive: 0x20ffb0, // Lighter emissive color
+      emissiveIntensity: 0.8, // Reduced from 1.5 to 0.8 for a more minimal look
+      metalness: 0.7,
+      roughness: 0.3,
+      reflectivity: 0.8,
+      clearcoat: 0.4
     } as THREE.MeshPhysicalMaterialParameters);
     
     // Store all animation timelines for proper cleanup
@@ -1696,7 +1829,7 @@ const DataProtectionJourney: React.FC<DataProtectionJourneyProps> = ({
       // Dispose of geometries and materials safely
       [lockBodyGeometry, leftPostGeometry, rightPostGeometry, leftHoleGeometry, rightHoleGeometry, 
        lockShackleGeometry, keyholeGeometry, keyholeSlotGeometry, keyholeRimGeometry,
-       lockGlowGeometry, innerGlowGeometry, middleGlowGeometry, outerGlowGeometry,
+       /* All glow geometries removed */
        ...orbitGeometries].forEach(geometry => {
          if (geometry && typeof geometry.dispose === 'function') {
            geometry.dispose();
@@ -1704,7 +1837,7 @@ const DataProtectionJourney: React.FC<DataProtectionJourneyProps> = ({
        });
       
       [lockMaterial, postMaterial, holeMaterial, shackleMaterial, keyholeMaterial, keyholeRimMaterial,
-       lockGlowMaterial, innerGlowMaterial, middleGlowMaterial, outerGlowMaterial].forEach(material => {
+       /* All glow materials removed */].forEach(material => {
         if (material && typeof material.dispose === 'function') {
           material.dispose();
         }
@@ -1871,41 +2004,44 @@ const DataProtectionJourney: React.FC<DataProtectionJourneyProps> = ({
             />
           </div>
           
-          {/* Stage Indicators - Aligned vertically with smaller text */}
+          {/* Stage Indicators - Using spans to avoid bullet points */}
           <div 
             className="flex flex-col justify-between text-xs font-medium"
             style={{ height: isMobile ? '90px' : '120px' }}
           >
-            <div 
+            <span 
               className={`transition-all duration-300 ${scrollProgress < 33 ? 'text-blue-300 scale-110' : 'text-gray-400'}`}
               style={{ 
                 opacity: scrollProgress < 33 ? 1 : 0.7,
                 textShadow: scrollProgress < 33 ? '0 0 10px rgba(59, 130, 246, 0.5)' : 'none',
-                fontSize: isMobile ? '0.65rem' : '0.75rem'
+                fontSize: isMobile ? '0.65rem' : '0.75rem',
+                display: 'inline-block'
               }}
             >
               Shrink
-            </div>
-            <div 
+            </span>
+            <span 
               className={`transition-all duration-300 ${scrollProgress >= 33 && scrollProgress < 66 ? 'text-orange-300 scale-110' : 'text-gray-400'}`}
               style={{ 
                 opacity: scrollProgress >= 33 && scrollProgress < 66 ? 1 : 0.7,
                 textShadow: scrollProgress >= 33 && scrollProgress < 66 ? '0 0 10px rgba(249, 115, 22, 0.5)' : 'none',
-                fontSize: isMobile ? '0.65rem' : '0.75rem'
+                fontSize: isMobile ? '0.65rem' : '0.75rem',
+                display: 'inline-block'
               }}
             >
               Shred
-            </div>
-            <div 
+            </span>
+            <span 
               className={`transition-all duration-300 ${scrollProgress >= 66 ? 'text-green-300 scale-110' : 'text-gray-400'}`}
               style={{ 
                 opacity: scrollProgress >= 66 ? 1 : 0.7,
                 textShadow: scrollProgress >= 66 ? '0 0 10px rgba(16, 185, 129, 0.5)' : 'none',
-                fontSize: isMobile ? '0.65rem' : '0.75rem'
+                fontSize: isMobile ? '0.65rem' : '0.75rem',
+                display: 'inline-block'
               }}
             >
               Secure
-            </div>
+            </span>
           </div>
         </div>
         

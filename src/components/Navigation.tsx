@@ -1,10 +1,12 @@
 import { useState, useRef, useEffect } from 'react';
 import Link from 'next/link';
+import { usePathname } from 'next/navigation';
 
 // Modern Navigation Component with Scale-inspired styling
 const Navigation = () => {
   const [activeDropdown, setActiveDropdown] = useState<string | null>(null);
   const dropdownRef = useRef<HTMLDivElement>(null);
+  const pathname = usePathname();
   
   // Menu items for the "Secure" dropdown
   const secureItems = [
@@ -17,17 +19,21 @@ const Navigation = () => {
 
   // Close dropdown when clicking outside
   useEffect(() => {
+    // Close dropdown when clicking outside
     const handleClickOutside = (event: MouseEvent) => {
       if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
         setActiveDropdown(null);
       }
     };
 
+    // Close dropdown when route changes
+    setActiveDropdown(null);
+
     document.addEventListener('mousedown', handleClickOutside);
     return () => {
       document.removeEventListener('mousedown', handleClickOutside);
     };
-  }, []);
+  }, [pathname]); // Add pathname as a dependency
 
   const handleMenuItemSelect = (item: string) => {
     console.log(`Selected: ${item}`);
