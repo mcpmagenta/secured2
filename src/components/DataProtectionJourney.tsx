@@ -127,6 +127,9 @@ const DataProtectionJourney: React.FC<DataProtectionJourneyProps> = ({
     // Make sure ScrollTrigger is registered in production
     if (typeof window !== 'undefined') {
       gsap.registerPlugin(ScrollTrigger, MotionPathPlugin);
+      
+      // Force a refresh to ensure proper initialization
+      ScrollTrigger.refresh();
     }
     
     // Create a new ScrollTrigger with safer configuration
@@ -147,17 +150,25 @@ const DataProtectionJourney: React.FC<DataProtectionJourneyProps> = ({
       },
       onUpdate: (self) => {
         // Update scroll progress for progress bar (0-100)
-        setScrollProgress(Math.round(self.progress * 100));
+        const newProgress = Math.round(self.progress * 100);
+        setScrollProgress(newProgress);
         
         // Update current stage based on progress with adjusted boundaries
         // Shrink phase: 0-35%, Shred phase: 35-70%, Secure phase: 70-100%
+        let newStage = 'shrink';
         if (self.progress < 0.35) {
-          setCurrentStage('shrink');
+          newStage = 'shrink';
         } else if (self.progress < 0.70) {
-          setCurrentStage('shred');
+          newStage = 'shred';
         } else {
           // Secure stage goes all the way to 100%
-          setCurrentStage('secure');
+          newStage = 'secure';
+        }
+        setCurrentStage(newStage);
+        
+        // Ensure the progress bar is visible once we have real data
+        if (newProgress > 0) {
+          setIsInitialized(true);
         }
         
         // Make sure the animation is still running
@@ -1964,6 +1975,22 @@ const DataProtectionJourney: React.FC<DataProtectionJourneyProps> = ({
   // Extract values once and memoize to prevent recalculation during render
   const { from, to, progress, stageName } = getProgressBarColors();
   
+  // Track whether the component is fully mounted and initialized
+  const [isInitialized, setIsInitialized] = useState(false);
+  
+  // Set initialization flag after a short delay to prevent flickering
+  useEffect(() => {
+    // Initial delay to prevent flickering during page load
+    const timer = setTimeout(() => {
+      // Only set to true if we don't already have progress data
+      if (scrollProgress === 0) {
+        setIsInitialized(true);
+      }
+    }, 500);
+    
+    return () => clearTimeout(timer);
+  }, [scrollProgress]);
+  
   return (
     <div ref={containerRef} className="w-full h-full" style={{ zIndex: 5 }}>
       {/* Canvas takes up the full container - using a stable key to prevent remounting */}
@@ -1975,7 +2002,7 @@ const DataProtectionJourney: React.FC<DataProtectionJourneyProps> = ({
       />
       
       {/* Progress Bar Container - Repositioned to avoid overlap with buttons */}
-      <div className="fixed z-40 flex flex-col items-start bg-black/30 backdrop-blur-sm p-3 rounded-lg border border-gray-800/50"
+      <div className={`fixed z-40 flex flex-col items-start bg-black/30 backdrop-blur-sm p-3 rounded-lg border border-gray-800/50 transition-opacity duration-500 ${isInitialized ? 'opacity-100' : 'opacity-0'}`}
         style={{
           width: isMobile ? '120px' : '160px',
           right: isMobile ? '1rem' : '2rem',
